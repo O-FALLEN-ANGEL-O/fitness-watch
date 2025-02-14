@@ -148,17 +148,41 @@ class FitnessTracker {
         });
     }
 
-    connectSmartwatch() {
-        alert("⌚ Connecting to smartwatch...");
-        setTimeout(() => {
-            alert("✅ Smartwatch connected! Heart rate tracking enabled.");
-            let liveHeartRate = 75 + Math.floor(Math.random() * 10);
-            setInterval(() => {
-                liveHeartRate += Math.random() > 0.5 ? 1 : -1;
-                this.heartRateEl.textContent = `${liveHeartRate} bpm`;
-            }, 5000);
-        }, 2000);
+  async connectSmartwatch() {
+    try {
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ['heart_rate']
+        });
+
+        if (device) {
+            alert(`✅ Connected to ${device.name}`);
+            this.monitorHeartRate(device);
+        }
+    } catch (error) {
+        alert("❌ No smartwatch found or connection failed.");
+        console.error(error);
     }
+}
+
+async monitorHeartRate(device) {
+    try {
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('heart_rate');
+        const characteristic = await service.getCharacteristic('heart_rate_measurement');
+
+        characteristic.addEventListener('characteristicvaluechanged', (event) => {
+            const value = event.target.value;
+            const heartRate = value.getUint8(1); 
+            this.heartRateEl.textContent = `${heartRate} bpm`;
+        });
+
+        await characteristic.startNotifications();
+    } catch (error) {
+        alert("❌ Failed to read heart rate.");
+        console.error(error);
+    }
+}
 
     trackSleep() {
         const hours = this.sleepInput.value;
